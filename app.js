@@ -261,6 +261,9 @@ async function checkAuthState() {
 
 // ================= تحميل بيانات المستخدم ================= //
 
+/**
+ * @param {{ id: string, email: string }} user
+ */
 async function loadUserProfile(user) {
 
     const welcomeMsg =
