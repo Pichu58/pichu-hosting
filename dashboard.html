@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - PICHU EMPIRE</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="dashboard-body">
+    <!-- شاشة تحميل مؤقتة أثناء التحقق من الجلسة -->
+    <div id="loading-screen" class="loading-screen">
+        جاري التحقق من الحساب...
+    </div>
+
+    <div id="dashboard-content" class="hidden">
+        <nav class="navbar dashboard-nav">
+            <div class="logo">PICHU <span>EMPIRE</span></div>
+            <div class="user-menu">
+                <span id="welcome-msg">مرحباً...</span>
+                <button class="btn-danger" onclick="logout()">تسجيل الخروج</button>
+            </div>
+        </nav>
+
+        <main class="dashboard-container">
+            <aside class="sidebar">
+                <ul>
+                    <li class="active">نظرة عامة</li>
+                    <li>بوتاتي</li>
+                    <li>إضافة بوت جديد</li>
+                    <li>الإعدادات</li>
+                </ul>
+            </aside>
+            
+            <section class="content">
+                <h2>إحصائيات الحساب</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>البوتات النشطة</h3>
+                        <p>0 / 1 (الخطة المجانية)</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>استهلاك الذاكرة</h3>
+                        <p>0 MB</p>
+                    </div>
+                </div>
+                
+                <div class="action-area">
+                    <h3>إدارة البوتات</h3>
+                    <p>قريباً: نظام رفع ملفات البوت وتشغيلها.</p>
+                    <button class="btn-primary" disabled>+ رفع بوت جديد</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

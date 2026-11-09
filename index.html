@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PICHU HOSTING EMPIRE</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">PICHU <span>EMPIRE</span></div>
+        <div class="nav-links">
+            <a href="#" onclick="showLogin()" id="nav-auth-link">تسجيل الدخول</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <h1>استضف بوت ديسكورد الخاص بك باحترافية</h1>
+        <p>تحكم كامل، استقرار عالي، وخدمة صممت خصيصاً لمطوري البوتات.</p>
+        <button class="btn-primary" onclick="showRegister()">ابدأ الآن مجاناً</button>
+    </header>
+
+    <!-- نافذة تسجيل الدخول / إنشاء حساب -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">تسجيل الدخول</h2>
+            <form id="auth-form">
+                <input type="text" id="username" placeholder="اسم المستخدم (للتسجيل فقط)" class="hidden">
+                <input type="email" id="email" placeholder="البريد الإلكتروني" required>
+                <input type="password" id="password" placeholder="كلمة المرور" required minlength="6">
+                <button type="submit" class="btn-primary" id="submit-btn">دخول</button>
+                <p id="auth-error" class="msg-box"></p>
+                <p class="toggle-auth">
+                    <span id="toggle-text">ليس لديك حساب؟</span>
+                    <a href="#" onclick="toggleAuthMode()" id="toggle-link">إنشاء حساب</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
