@@ -25,30 +25,44 @@
         <main class="dashboard-container">
             <aside class="sidebar">
                 <ul>
-                    <li class="active">نظرة عامة</li>
+                    <li class="active">لوحة التحكم</li>
                     <li>بوتاتي</li>
-                    <li>إضافة بوت جديد</li>
-                    <li>الإعدادات</li>
+                    <li>إعدادات الحساب</li>
                 </ul>
             </aside>
             
             <section class="content">
-                <h2>إحصائيات الحساب</h2>
+                <h2>إحصائيات الخادم</h2>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <h3>البوتات النشطة</h3>
-                        <p>0 / 1 (الخطة المجانية)</p>
+                        <h3>حالة البوت</h3>
+                        <p id="bot-status-text" style="color: var(--text-muted); font-weight: bold;">متوقف 🔴</p>
                     </div>
                     <div class="stat-card">
-                        <h3>استهلاك الذاكرة</h3>
-                        <p>0 MB</p>
+                        <h3>استهلاك الذاكرة (RAM)</h3>
+                        <p>0 MB / 512 MB</p>
                     </div>
                 </div>
                 
                 <div class="action-area">
-                    <h3>إدارة البوتات</h3>
-                    <p>قريباً: نظام رفع ملفات البوت وتشغيلها.</p>
-                    <button class="btn-primary" disabled>+ رفع بوت جديد</button>
+                    <h3>إدارة وتشغيل البوت</h3>
+                    <div class="bot-form">
+                        <div class="input-group">
+                            <label for="bot-token">توكن البوت (Bot Token):</label>
+                            <input type="password" id="bot-token" placeholder="أدخل توكن البوت هنا لتشغيله..." autocomplete="off">
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="bot-file">ملف البوت (index.js أو .zip):</label>
+                            <input type="file" id="bot-file" accept=".js, .zip">
+                        </div>
+
+                        <div class="button-group">
+                            <button class="btn-primary" id="start-bot-btn" onclick="startBot()">▶ تشغيل البوت</button>
+                            <button class="btn-danger hidden" id="stop-bot-btn" onclick="stopBot()">⏹ إيقاف البوت</button>
+                        </div>
+                        <p id="bot-action-msg" class="msg-box"></p>
+                    </div>
                 </div>
             </section>
         </main>
