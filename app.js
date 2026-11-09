@@ -46,8 +46,10 @@ window.showLogin = function () {
     document.getElementById('modal-title').innerText = 'تسجيل الدخول';
 
     const username = document.getElementById('username');
-    username.classList.add('hidden');
-    username.removeAttribute('required');
+    if (username) {
+        username.classList.add('hidden');
+        username.removeAttribute('required');
+    }
 
     document.getElementById('submit-btn').innerText = 'دخول';
     document.getElementById('toggle-text').innerText = 'ليس لديك حساب؟ ';
@@ -68,8 +70,10 @@ window.showRegister = function () {
     document.getElementById('modal-title').innerText = 'إنشاء حساب جديد';
 
     const username = document.getElementById('username');
-    username.classList.remove('hidden');
-    username.setAttribute('required', 'true');
+    if (username) {
+        username.classList.remove('hidden');
+        username.setAttribute('required', 'true');
+    }
 
     document.getElementById('submit-btn').innerText = 'تسجيل';
     document.getElementById('toggle-text').innerText = 'لديك حساب بالفعل؟ ';
@@ -81,7 +85,6 @@ window.showRegister = function () {
 
 window.closeModal = function () {
     const modal = document.getElementById('auth-modal');
-
     if (modal) {
         modal.classList.add('hidden');
     }
@@ -116,7 +119,8 @@ if (authForm) {
 
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
-        const username = document.getElementById('username').value.trim();
+        const usernameInput = document.getElementById('username');
+        const username = usernameInput ? usernameInput.value.trim() : '';
 
         errorMsg.style.color = 'var(--text-main)';
         errorMsg.innerText = 'جاري التحميل...';
@@ -125,9 +129,7 @@ if (authForm) {
 
         try {
             if (isLoginMode) {
-
                 // تسجيل الدخول
-
                 const { data, error } =
                     await supabaseClient.auth.signInWithPassword({
                         email: email,
@@ -136,14 +138,11 @@ if (authForm) {
 
                 if (error) throw error;
 
-                if (data.user) {
+                if (data.session) {
                     window.location.href = 'dashboard.html';
                 }
-
             } else {
-
                 // إنشاء حساب جديد
-
                 if (!username) {
                     throw new Error('يرجى إدخال اسم المستخدم');
                 }
@@ -162,16 +161,11 @@ if (authForm) {
                 if (error) throw error;
 
                 if (data.session === null) {
-
                     errorMsg.style.color = 'var(--warning)';
-
                     errorMsg.innerText =
                         'تم التسجيل بنجاح! يرجى مراجعة بريدك الإلكتروني لتأكيد الحساب قبل الدخول.';
-
                 } else {
-
                     errorMsg.style.color = 'var(--success)';
-
                     errorMsg.innerText =
                         'تم إنشاء الحساب بنجاح! جاري التوجيه...';
 
@@ -180,86 +174,67 @@ if (authForm) {
                     }, 1500);
                 }
             }
-
         } catch (error) {
-
             errorMsg.style.color = 'var(--danger)';
             errorMsg.innerText = error.message;
-
         } finally {
-
             submitBtn.disabled = false;
         }
     });
 }
 
-// ================= التحقق من الحساب ================= //
+// ================= التحقق من الحساب وحماية لوحة التحكم ================= //
 
 async function checkAuthState() {
     initializeSupabase();
 
-    if (!isDashboard && !supabaseClient) {
-        return;
-    }
-
-    if (!isDashboard && supabaseClient) {
-        try {
-            const { data } = await supabaseClient.auth.getSession();
-
-            if (data.session) {
-                const authLink =
-                    document.getElementById('nav-auth-link');
-
-                if (authLink) {
-                    authLink.innerText = 'لوحة التحكم';
-
-                    authLink.onclick = function () {
-                        window.location.href = 'dashboard.html';
-                    };
+    if (!isDashboard) {
+        if (supabaseClient) {
+            try {
+                const { data } = await supabaseClient.auth.getSession();
+                if (data && data.session) {
+                    const authLink = document.getElementById('nav-auth-link');
+                    if (authLink) {
+                        authLink.innerText = 'لوحة التحكم';
+                        authLink.onclick = function () {
+                            window.location.href = 'dashboard.html';
+                        };
+                    }
                 }
+            } catch (err) {
+                console.error(err);
             }
-        } catch (error) {
-            console.error(error);
         }
-
         return;
     }
 
-    const loadingScreen =
-        document.getElementById('loading-screen');
+    const loadingScreen = document.getElementById('loading-screen');
+    const dashboardContent = document.getElementById('dashboard-content');
 
     if (!supabaseClient) {
         if (loadingScreen) {
-            loadingScreen.innerText =
-                'تعذر الاتصال بالخدمة، يرجى تحديث الصفحة.';
+            loadingScreen.innerText = 'تعذر الاتصال بالخدمة، يرجى تحديث الصفحة.';
         }
         return;
     }
 
     try {
+        const { data, error } = await supabaseClient.auth.getSession();
 
-        const { data, error } =
-            await supabaseClient.auth.getSession();
-
-        if (error || !data.session) {
+        if (error || !data || !data.session) {
             window.location.replace('index.html');
             return;
         }
 
-        if (loadingScreen) {
-            loadingScreen.classList.add('hidden');
-        }
+        // إظهار لوحة التحكم وإخفاء شاشة التحميل فور التأكد من وجود الجلسة
+        if (loadingScreen) loadingScreen.classList.add('hidden');
+        if (dashboardContent) dashboardContent.classList.remove('hidden');
 
-        document
-            .getElementById('dashboard-content')
-            .classList.remove('hidden');
-
-        await loadUserProfile(data.session.user);
+        // جلب البيانات بشكل منفصل
+        loadUserProfile(data.session.user);
 
     } catch (error) {
-
         console.error('Auth error:', error);
-
         window.location.replace('index.html');
     }
 }
@@ -270,60 +245,41 @@ async function checkAuthState() {
  * @param {{ id: string, email: string }} user
  */
 async function loadUserProfile(user) {
-
-    const welcomeMsg =
-        document.getElementById('welcome-msg');
-
+    const welcomeMsg = document.getElementById('welcome-msg');
     if (!welcomeMsg) return;
 
-    try {
+    // الاسم الافتراضي مبدئياً
+    welcomeMsg.innerText = `مرحباً، ${user.email.split('@')[0]}`;
 
+    try {
         const { data, error } = await supabaseClient
             .from('profiles')
             .select('username')
             .eq('id', user.id)
-            .single();
-
-        if (error) throw error;
+            .maybeSingle();
 
         if (data && data.username) {
-            welcomeMsg.innerText =
-                `مرحباً، ${data.username}`;
-        } else {
-            welcomeMsg.innerText =
-                `مرحباً، ${user.email.split('@')[0]}`;
+            welcomeMsg.innerText = `مرحباً، ${data.username}`;
         }
-
-    } catch (error) {
-
-        console.error('Profile error:', error);
-
-        welcomeMsg.innerText =
-            `مرحباً، ${user.email.split('@')[0]}`;
+    } catch (err) {
+        console.warn('تعذر تحميل اسم المستخدم من الجدول:', err);
     }
 }
 
 // ================= تسجيل الخروج ================= //
 
 window.logout = async function () {
-
     if (!supabaseClient) {
         window.location.replace('index.html');
         return;
     }
 
     try {
-
-        const { error } = await supabaseClient.auth.signOut();
-
-        if (error) throw error;
-
-        window.location.replace('index.html');
-
-    } catch (error) {
-
-        alert('حدث خطأ أثناء تسجيل الخروج: ' + error.message);
+        await supabaseClient.auth.signOut();
+    } catch (err) {
+        console.error(err);
     }
+    window.location.replace('index.html');
 };
 
 // ================= تشغيل النظام ================= //
