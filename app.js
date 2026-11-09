@@ -282,6 +282,65 @@ window.logout = async function () {
     window.location.replace('index.html');
 };
 
+// ================= إدارة البوت (واجهة لوحة التحكم) ================= //
+
+window.startBot = function() {
+    const token = document.getElementById('bot-token').value.trim();
+    const fileInput = document.getElementById('bot-file').files[0];
+    const msgBox = document.getElementById('bot-action-msg');
+    
+    if (!token) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'يرجى إدخال توكن البوت أولاً.';
+        return;
+    }
+
+    if (!fileInput) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'يرجى رفع ملف البوت (index.js أو .zip).';
+        return;
+    }
+
+    msgBox.style.color = 'var(--text-main)';
+    msgBox.innerText = 'جاري الاتصال بالخادم وتشغيل البوت...';
+    
+    document.getElementById('start-bot-btn').disabled = true;
+
+    // تمثيل مبدئي لعملية الاتصال بالخادم (سيتم ربطها بـ Backend حقيقي لاحقاً)
+    setTimeout(() => {
+        msgBox.style.color = 'var(--success)';
+        msgBox.innerText = 'تم تشغيل البوت بنجاح!';
+        
+        document.getElementById('bot-status-text').innerText = 'يعمل 🟢';
+        document.getElementById('bot-status-text').style.color = 'var(--success)';
+        
+        document.getElementById('start-bot-btn').classList.add('hidden');
+        document.getElementById('stop-bot-btn').classList.remove('hidden');
+        document.getElementById('start-bot-btn').disabled = false;
+    }, 2000);
+};
+
+window.stopBot = function() {
+    const msgBox = document.getElementById('bot-action-msg');
+    
+    msgBox.style.color = 'var(--text-main)';
+    msgBox.innerText = 'جاري إيقاف البوت...';
+    document.getElementById('stop-bot-btn').disabled = true;
+
+    // تمثيل مبدئي لعملية الإيقاف
+    setTimeout(() => {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'تم إيقاف البوت.';
+        
+        document.getElementById('bot-status-text').innerText = 'متوقف 🔴';
+        document.getElementById('bot-status-text').style.color = 'var(--text-muted)';
+        
+        document.getElementById('stop-bot-btn').classList.add('hidden');
+        document.getElementById('start-bot-btn').classList.remove('hidden');
+        document.getElementById('stop-bot-btn').disabled = false;
+    }, 1000);
+};
+
 // ================= تشغيل النظام ================= //
 
 initializeSupabase();
