@@ -3,7 +3,7 @@
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
 const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 
-let supabase = null;
+let supabaseClient = null;
 let isLoginMode = true;
 
 const isDashboard = window.location.pathname.includes('dashboard.html');
@@ -11,13 +11,17 @@ const isDashboard = window.location.pathname.includes('dashboard.html');
 // ================= تشغيل Supabase ================= //
 
 function initializeSupabase() {
-    if (!window.supabase) {
+    if (supabaseClient) {
+        return true;
+    }
+
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
         console.error('Supabase library failed to load');
         return false;
     }
 
     try {
-        supabase = window.supabase.createClient(
+        supabaseClient = window.supabase.createClient(
             supabaseUrl,
             supabaseKey
         );
@@ -104,7 +108,7 @@ if (authForm) {
         const errorMsg = document.getElementById('auth-error');
         const submitBtn = document.getElementById('submit-btn');
 
-        if (!supabase) {
+        if (!supabaseClient && !initializeSupabase()) {
             errorMsg.style.color = 'var(--danger)';
             errorMsg.innerText = 'تعذر الاتصال بخدمة الحسابات، حاول تحديث الصفحة.';
             return;
@@ -125,7 +129,7 @@ if (authForm) {
                 // تسجيل الدخول
 
                 const { data, error } =
-                    await supabase.auth.signInWithPassword({
+                    await supabaseClient.auth.signInWithPassword({
                         email: email,
                         password: password
                     });
@@ -145,7 +149,7 @@ if (authForm) {
                 }
 
                 const { data, error } =
-                    await supabase.auth.signUp({
+                    await supabaseClient.auth.signUp({
                         email: email,
                         password: password,
                         options: {
@@ -192,14 +196,15 @@ if (authForm) {
 // ================= التحقق من الحساب ================= //
 
 async function checkAuthState() {
+    initializeSupabase();
 
-    if (!isDashboard && !supabase) {
+    if (!isDashboard && !supabaseClient) {
         return;
     }
 
-    if (!isDashboard && supabase) {
+    if (!isDashboard && supabaseClient) {
         try {
-            const { data } = await supabase.auth.getSession();
+            const { data } = await supabaseClient.auth.getSession();
 
             if (data.session) {
                 const authLink =
@@ -223,7 +228,7 @@ async function checkAuthState() {
     const loadingScreen =
         document.getElementById('loading-screen');
 
-    if (!supabase) {
+    if (!supabaseClient) {
         if (loadingScreen) {
             loadingScreen.innerText =
                 'تعذر الاتصال بالخدمة، يرجى تحديث الصفحة.';
@@ -234,7 +239,7 @@ async function checkAuthState() {
     try {
 
         const { data, error } =
-            await supabase.auth.getSession();
+            await supabaseClient.auth.getSession();
 
         if (error || !data.session) {
             window.location.replace('index.html');
@@ -273,7 +278,7 @@ async function loadUserProfile(user) {
 
     try {
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('profiles')
             .select('username')
             .eq('id', user.id)
@@ -302,14 +307,14 @@ async function loadUserProfile(user) {
 
 window.logout = async function () {
 
-    if (!supabase) {
+    if (!supabaseClient) {
         window.location.replace('index.html');
         return;
     }
 
     try {
 
-        const { error } = await supabase.auth.signOut();
+        const { error } = await supabaseClient.auth.signOut();
 
         if (error) throw error;
 
