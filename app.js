@@ -6,7 +6,12 @@ const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 let supabaseClient = null;
 let isLoginMode = true;
 
-const isDashboard = window.location.pathname.includes('dashboard.html');
+function isDashboardPage() {
+    return (
+        window.location.pathname.includes('dashboard') ||
+        document.getElementById('dashboard-content') !== null
+    );
+}
 
 // ================= تشغيل Supabase ================= //
 
@@ -129,7 +134,6 @@ if (authForm) {
 
         try {
             if (isLoginMode) {
-                // تسجيل الدخول
                 const { data, error } =
                     await supabaseClient.auth.signInWithPassword({
                         email: email,
@@ -142,7 +146,6 @@ if (authForm) {
                     window.location.href = 'dashboard.html';
                 }
             } else {
-                // إنشاء حساب جديد
                 if (!username) {
                     throw new Error('يرجى إدخال اسم المستخدم');
                 }
@@ -188,7 +191,9 @@ if (authForm) {
 async function checkAuthState() {
     initializeSupabase();
 
-    if (!isDashboard) {
+    const onDashboard = isDashboardPage();
+
+    if (!onDashboard) {
         if (supabaseClient) {
             try {
                 const { data } = await supabaseClient.auth.getSession();
@@ -213,7 +218,7 @@ async function checkAuthState() {
 
     if (!supabaseClient) {
         if (loadingScreen) {
-            loadingScreen.innerText = 'تعذر الاتصال بالخدمة، يرجى تحديث الصفحة.';
+            loadingScreen.innerText = 'تعذر تحميل مكتبة الاتصال، يرجى تحديث الصفحة.';
         }
         return;
     }
@@ -226,11 +231,9 @@ async function checkAuthState() {
             return;
         }
 
-        // إظهار لوحة التحكم وإخفاء شاشة التحميل فور التأكد من وجود الجلسة
         if (loadingScreen) loadingScreen.classList.add('hidden');
         if (dashboardContent) dashboardContent.classList.remove('hidden');
 
-        // جلب البيانات بشكل منفصل
         loadUserProfile(data.session.user);
 
     } catch (error) {
@@ -248,11 +251,11 @@ async function loadUserProfile(user) {
     const welcomeMsg = document.getElementById('welcome-msg');
     if (!welcomeMsg) return;
 
-    // الاسم الافتراضي مبدئياً
-    welcomeMsg.innerText = `مرحباً، ${user.email.split('@')[0]}`;
+    const fallbackName = user.email ? user.email.split('@')[0] : 'عميلنا العزيز';
+    welcomeMsg.innerText = `مرحباً، ${fallbackName}`;
 
     try {
-        const { data, error } = await supabaseClient
+        const { data } = await supabaseClient
             .from('profiles')
             .select('username')
             .eq('id', user.id)
@@ -262,22 +265,19 @@ async function loadUserProfile(user) {
             welcomeMsg.innerText = `مرحباً، ${data.username}`;
         }
     } catch (err) {
-        console.warn('تعذر تحميل اسم المستخدم من الجدول:', err);
+        console.warn('Profile fetch warning:', err);
     }
 }
 
 // ================= تسجيل الخروج ================= //
 
 window.logout = async function () {
-    if (!supabaseClient) {
-        window.location.replace('index.html');
-        return;
-    }
-
-    try {
-        await supabaseClient.auth.signOut();
-    } catch (err) {
-        console.error(err);
+    if (supabaseClient) {
+        try {
+            await supabaseClient.auth.signOut();
+        } catch (err) {
+            console.error(err);
+        }
     }
     window.location.replace('index.html');
 };
@@ -286,6 +286,8 @@ window.logout = async function () {
 
 initializeSupabase();
 
-window.addEventListener('DOMContentLoaded', function () {
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', checkAuthState);
+} else {
     checkAuthState();
-});
+}
