@@ -1,3 +1,4 @@
+
 // ================= إعداد Supabase ================= //
 
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
@@ -16,9 +17,7 @@ function isDashboardPage() {
 // ================= تشغيل Supabase ================= //
 
 function initializeSupabase() {
-    if (supabaseClient) {
-        return true;
-    }
+    if (supabaseClient) return true;
 
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
         console.error('Supabase library failed to load');
@@ -30,7 +29,6 @@ function initializeSupabase() {
             supabaseUrl,
             supabaseKey
         );
-
         return true;
     } catch (error) {
         console.error('Supabase initialization error:', error);
@@ -47,7 +45,6 @@ window.showLogin = function () {
     if (!modal) return;
 
     modal.classList.remove('hidden');
-
     document.getElementById('modal-title').innerText = 'تسجيل الدخول';
 
     const username = document.getElementById('username');
@@ -71,7 +68,6 @@ window.showRegister = function () {
     if (!modal) return;
 
     modal.classList.remove('hidden');
-
     document.getElementById('modal-title').innerText = 'إنشاء حساب جديد';
 
     const username = document.getElementById('username');
@@ -90,9 +86,7 @@ window.showRegister = function () {
 
 window.closeModal = function () {
     const modal = document.getElementById('auth-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
+    if (modal) modal.classList.add('hidden');
 };
 
 // ================= التبديل بين الدخول والتسجيل ================= //
@@ -129,15 +123,14 @@ if (authForm) {
 
         errorMsg.style.color = 'var(--text-main)';
         errorMsg.innerText = 'جاري التحميل...';
-
         submitBtn.disabled = true;
 
         try {
             if (isLoginMode) {
                 const { data, error } =
                     await supabaseClient.auth.signInWithPassword({
-                        email: email,
-                        password: password
+                        email,
+                        password
                     });
 
                 if (error) throw error;
@@ -152,12 +145,10 @@ if (authForm) {
 
                 const { data, error } =
                     await supabaseClient.auth.signUp({
-                        email: email,
-                        password: password,
+                        email,
+                        password,
                         options: {
-                            data: {
-                                username: username
-                            }
+                            data: { username }
                         }
                     });
 
@@ -197,8 +188,10 @@ async function checkAuthState() {
         if (supabaseClient) {
             try {
                 const { data } = await supabaseClient.auth.getSession();
+
                 if (data && data.session) {
                     const authLink = document.getElementById('nav-auth-link');
+
                     if (authLink) {
                         authLink.innerText = 'لوحة التحكم';
                         authLink.onclick = function () {
@@ -218,7 +211,8 @@ async function checkAuthState() {
 
     if (!supabaseClient) {
         if (loadingScreen) {
-            loadingScreen.innerText = 'تعذر تحميل مكتبة الاتصال، يرجى تحديث الصفحة.';
+            loadingScreen.innerText =
+                'تعذر تحميل مكتبة الاتصال، يرجى تحديث الصفحة.';
         }
         return;
     }
@@ -234,7 +228,8 @@ async function checkAuthState() {
         if (loadingScreen) loadingScreen.classList.add('hidden');
         if (dashboardContent) dashboardContent.classList.remove('hidden');
 
-        loadUserProfile(data.session.user);
+        await loadUserProfile(data.session.user);
+        await loadHostingServices();
 
     } catch (error) {
         console.error('Auth error:', error);
@@ -244,14 +239,14 @@ async function checkAuthState() {
 
 // ================= تحميل بيانات المستخدم ================= //
 
-/**
- * @param {{ id: string, email: string }} user
- */
 async function loadUserProfile(user) {
     const welcomeMsg = document.getElementById('welcome-msg');
     if (!welcomeMsg) return;
 
-    const fallbackName = user.email ? user.email.split('@')[0] : 'عميلنا العزيز';
+    const fallbackName = user.email
+        ? user.email.split('@')[0]
+        : 'عميلنا العزيز';
+
     welcomeMsg.innerText = `مرحباً، ${fallbackName}`;
 
     try {
@@ -269,6 +264,66 @@ async function loadUserProfile(user) {
     }
 }
 
+// ================= تحميل استضافات العميل ================= //
+
+async function loadHostingServices() {
+    const container = document.getElementById('hosting-services-list');
+    if (!container || !supabaseClient) return;
+
+    container.innerText = 'جاري تحميل استضافاتك...';
+
+    try {
+        const { data: { user }, error: userError } =
+            await supabaseClient.auth.getUser();
+
+        if (userError || !user) {
+            throw new Error('تعذر التحقق من حسابك');
+        }
+
+        const { data, error } = await supabaseClient
+            .from('hosting_services')
+            .select('id, service_name, service_type, status, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        container.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            container.innerText = 'لا توجد استضافات حتى الآن.';
+            return;
+        }
+
+        data.forEach(service => {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+
+            const name = document.createElement('h3');
+            name.textContent = service.service_name || 'استضافة بدون اسم';
+
+            const type = document.createElement('p');
+            type.textContent = 'النوع: ' + (service.service_type || 'غير محدد');
+
+            const status = document.createElement('p');
+
+            const isRunning = service.status === 'running';
+
+            status.textContent = isRunning
+                ? 'الحالة: يعمل 🟢'
+                : 'الحالة: متوقف 🔴';
+
+            card.append(name, type, status);
+            container.appendChild(card);
+        });
+
+    } catch (error) {
+        console.error('Hosting services error:', error);
+        container.innerText =
+            'تعذر تحميل الاستضافات. تحقق من الاتصال والصلاحيات.';
+    }
+}
+
 // ================= تسجيل الخروج ================= //
 
 window.logout = async function () {
@@ -279,66 +334,49 @@ window.logout = async function () {
             console.error(err);
         }
     }
+
     window.location.replace('index.html');
 };
 
-// ================= إدارة البوت (واجهة لوحة التحكم) ================= //
+// ================= إدارة البوت - تجريبية حالياً ================= //
 
-window.startBot = function() {
-    const token = document.getElementById('bot-token').value.trim();
-    const fileInput = document.getElementById('bot-file').files[0];
+window.startBot = function () {
+    const tokenInput = document.getElementById('bot-token');
+    const fileInput = document.getElementById('bot-file');
     const msgBox = document.getElementById('bot-action-msg');
-    
+
+    if (!tokenInput || !fileInput || !msgBox) return;
+
+    const token = tokenInput.value.trim();
+    const file = fileInput.files[0];
+
     if (!token) {
         msgBox.style.color = 'var(--warning)';
         msgBox.innerText = 'يرجى إدخال توكن البوت أولاً.';
         return;
     }
 
-    if (!fileInput) {
+    if (!file) {
         msgBox.style.color = 'var(--warning)';
         msgBox.innerText = 'يرجى رفع ملف البوت (index.js أو .zip).';
         return;
     }
 
-    msgBox.style.color = 'var(--text-main)';
-    msgBox.innerText = 'جاري الاتصال بالخادم وتشغيل البوت...';
-    
-    document.getElementById('start-bot-btn').disabled = true;
+    msgBox.style.color = 'var(--warning)';
+    msgBox.innerText =
+        'واجهة التشغيل تجريبية حالياً، لم يتم تشغيل البوت على خادم فعلي.';
 
-    // تمثيل مبدئي لعملية الاتصال بالخادم (سيتم ربطها بـ Backend حقيقي لاحقاً)
-    setTimeout(() => {
-        msgBox.style.color = 'var(--success)';
-        msgBox.innerText = 'تم تشغيل البوت بنجاح!';
-        
-        document.getElementById('bot-status-text').innerText = 'يعمل 🟢';
-        document.getElementById('bot-status-text').style.color = 'var(--success)';
-        
-        document.getElementById('start-bot-btn').classList.add('hidden');
-        document.getElementById('stop-bot-btn').classList.remove('hidden');
-        document.getElementById('start-bot-btn').disabled = false;
-    }, 2000);
 };
 
-window.stopBot = function() {
+// لا تعرض نجاحاً وهمياً عند الإيقاف
+window.stopBot = function () {
     const msgBox = document.getElementById('bot-action-msg');
-    
-    msgBox.style.color = 'var(--text-main)';
-    msgBox.innerText = 'جاري إيقاف البوت...';
-    document.getElementById('stop-bot-btn').disabled = true;
 
-    // تمثيل مبدئي لعملية الإيقاف
-    setTimeout(() => {
+    if (msgBox) {
         msgBox.style.color = 'var(--warning)';
-        msgBox.innerText = 'تم إيقاف البوت.';
-        
-        document.getElementById('bot-status-text').innerText = 'متوقف 🔴';
-        document.getElementById('bot-status-text').style.color = 'var(--text-muted)';
-        
-        document.getElementById('stop-bot-btn').classList.add('hidden');
-        document.getElementById('start-bot-btn').classList.remove('hidden');
-        document.getElementById('stop-bot-btn').disabled = false;
-    }, 1000);
+        msgBox.innerText =
+            'لا يوجد خادم تشغيل فعلي متصل لإيقاف البوت حالياً.';
+    }
 };
 
 // ================= تشغيل النظام ================= //
