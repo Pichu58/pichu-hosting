@@ -1,3 +1,4 @@
+
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
 const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 
@@ -54,12 +55,22 @@ window.loadAdminData = async function () {
 
         if (error) throw error;
 
-        renderCustomers(data.customers || []);
+        // تحميل بيانات العملاء التفصيلية
+        const { data: customersData, error: customersError } =
+            await db.rpc('admin_customers_data');
+
+        if (customersError) throw customersError;
+
+        const customers = Array.isArray(customersData)
+            ? customersData
+            : (customersData?.customers || []);
+
+        renderCustomers(customers);
         renderServices(data.services || []);
         renderPlans(data.plans || []);
 
         document.getElementById('customer-count').textContent =
-            (data.customers || []).length;
+            customers.length;
 
         document.getElementById('service-count').textContent =
             (data.services || []).length;
@@ -74,6 +85,8 @@ window.loadAdminData = async function () {
         showMessage(error.message || 'تعذر تحميل البيانات.', 'red');
     }
 };
+
+// ================= إدارة العملاء =================
 
 function renderCustomers(customers) {
     const container = document.getElementById('customers-list');
@@ -91,13 +104,108 @@ function renderCustomers(customers) {
         const name = document.createElement('h3');
         name.textContent = customer.username || 'عميل بدون اسم';
 
-        const id = document.createElement('p');
-        id.textContent = 'معرف الحساب: ' + customer.id;
+        const email = document.createElement('p');
+        email.textContent = 'البريد الإلكتروني: ' +
+            (customer.email || 'غير متوفر');
 
-        card.append(name, id);
+        const id = document.createElement('p');
+        id.textContent = 'معرف الحساب: ' +
+            (customer.id || customer.user_id || 'غير متوفر');
+
+        const plan = document.createElement('p');
+        plan.textContent = 'الباقة: ' +
+            (customer.plan_name || 'لا توجد باقة');
+
+        const subscription = document.createElement('p');
+        subscription.textContent = 'حالة الاشتراك: ' +
+            (customer.subscription_status || 'غير مشترك');
+
+        const expires = document.createElement('p');
+
+        if (customer.expires_at) {
+            const date = new Date(customer.expires_at);
+            expires.textContent = 'تاريخ انتهاء الاشتراك: ' +
+                (isNaN(date.getTime())
+                    ? customer.expires_at
+                    : date.toLocaleDateString('ar'));
+        } else {
+            expires.textContent = 'تاريخ انتهاء الاشتراك: غير محدد';
+        }
+
+        const active = document.createElement('p');
+        const isActive = customer.is_active !== false;
+
+        active.textContent = isActive
+            ? 'حالة الحساب: نشط 🟢'
+            : 'حالة الحساب: موقوف 🔴';
+
+        active.style.color = isActive ? 'green' : 'red';
+
+        const toggleButton = document.createElement('button');
+
+        toggleButton.textContent = isActive
+            ? 'إيقاف الحساب'
+            : 'إعادة تفعيل الحساب';
+
+        toggleButton.style.marginTop = '10px';
+
+        toggleButton.onclick = () => {
+            const userId = customer.id || customer.user_id;
+
+            if (!userId) {
+                alert('تعذر تحديد معرف العميل.');
+                return;
+            }
+
+            updateCustomerStatus(userId, !isActive);
+        };
+
+        card.append(
+            name,
+            email,
+            id,
+            plan,
+            subscription,
+            expires,
+            active,
+            toggleButton
+        );
+
         container.appendChild(card);
     });
 }
+
+async function updateCustomerStatus(userId, isActive) {
+    const action = isActive ? 'إعادة تفعيل' : 'إيقاف';
+
+    if (!confirm(`هل أنت متأكد من ${action} حساب هذا العميل؟`)) {
+        return;
+    }
+
+    try {
+        showMessage('جاري تحديث حالة العميل...');
+
+        const { error } = await db.rpc('admin_set_customer_status', {
+            p_user_id: userId,
+            p_is_active: isActive
+        });
+
+        if (error) throw error;
+
+        alert(isActive
+            ? 'تمت إعادة تفعيل حساب العميل.'
+            : 'تم إيقاف حساب العميل.');
+
+        await loadAdminData();
+
+    } catch (error) {
+        console.error(error);
+        alert(error.message || 'تعذر تحديث حالة العميل.');
+        showMessage('فشل تحديث حالة العميل.', 'red');
+    }
+}
+
+// ================= طلبات الاستضافة =================
 
 function renderServices(services) {
     const container = document.getElementById('services-list');
@@ -161,6 +269,8 @@ function renderServices(services) {
         container.appendChild(card);
     });
 }
+
+// ================= إدارة الباقات =================
 
 function renderPlans(plans) {
     const container = document.getElementById('plans-list');
@@ -271,6 +381,8 @@ window.savePlan = async function () {
     }
 };
 
+// ================= تحديث حالة الطلب =================
+
 async function updateServiceStatus(id, status) {
     const action = status === 'approved' ? 'قبول' : 'رفض';
 
@@ -294,6 +406,8 @@ async function updateServiceStatus(id, status) {
         alert(error.message || 'تعذر تحديث الطلب.');
     }
 }
+
+// ================= تسجيل الخروج =================
 
 window.adminLogout = async function () {
     await db.auth.signOut();
