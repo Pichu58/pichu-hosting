@@ -541,13 +541,17 @@ async function loadHostingServices() {
 
             const status = document.createElement('p');
 
-            if (service.status === 'running') {
-                status.textContent = 'الحالة: يعمل 🟢';
-            } else if (service.status === 'pending') {
-                status.textContent = 'الحالة: بانتظار التجهيز 🟡';
-            } else {
-                status.textContent = 'الحالة: متوقف 🔴';
-            }
+            // حالات الاستضافة بعد تعديل لوحة المالك
+            const statusLabels = {
+                running: 'الحالة: يعمل 🟢',
+                pending: 'الحالة: بانتظار التجهيز 🟡',
+                approved: 'الحالة: تمت الموافقة 🟢',
+                rejected: 'الحالة: تم رفض الطلب 🔴'
+            };
+
+            status.textContent =
+                statusLabels[service.status] ||
+                'الحالة: متوقف 🔴';
 
             const fileStatus = document.createElement('p');
 
