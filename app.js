@@ -1,5 +1,5 @@
 
-// ================= إعداد Supabase ================= //
+ // ================= إعداد Supabase ================= //
 
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
 const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
@@ -264,7 +264,7 @@ async function loadUserProfile(user) {
     }
 }
 
-// ================= إنشاء استضافة Discord Bot ================= //
+// ================= إنشاء استضافة Discord Bot ورفع الملف ================= //
 
 window.createBotHosting = async function () {
     const nameInput = document.getElementById('new-bot-name');
@@ -272,9 +272,10 @@ window.createBotHosting = async function () {
     const msgBox = document.getElementById('create-bot-msg');
     const createBtn = document.getElementById('create-bot-btn');
 
-    if (!nameInput || !msgBox || !createBtn) return;
+    if (!nameInput || !fileInput || !msgBox || !createBtn) return;
 
     const botName = nameInput.value.trim();
+    const file = fileInput.files[0];
 
     if (!botName) {
         msgBox.style.color = 'var(--warning)';
@@ -288,6 +289,24 @@ window.createBotHosting = async function () {
         return;
     }
 
+    if (!file) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'يرجى اختيار ملف البوت ZIP.';
+        return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'يجب أن يكون الملف بصيغة ZIP.';
+        return;
+    }
+
+    if (file.size === 0) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'الملف فارغ.';
+        return;
+    }
+
     if (!initializeSupabase()) {
         msgBox.style.color = 'var(--danger)';
         msgBox.innerText = 'تعذر الاتصال بقاعدة البيانات.';
@@ -296,38 +315,69 @@ window.createBotHosting = async function () {
 
     createBtn.disabled = true;
     msgBox.style.color = 'var(--text-main)';
-    msgBox.innerText = 'جاري إنشاء الاستضافة...';
+    msgBox.innerText = 'جاري التحقق من الحساب...';
+
+    let uploadedPath = null;
 
     try {
         const { data: userData, error: userError } =
             await supabaseClient.auth.getUser();
 
         if (userError || !userData.user) {
-            throw new Error('انتهت جلستك، يرجى تسجيل الدخول مجدداً.');
+            throw new Error('يرجى تسجيل الدخول مجدداً.');
         }
 
         const user = userData.user;
 
-        const { error } = await supabaseClient
+        // إنشاء مسار خاص بالعميل
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `${user.id}/${Date.now()}-${safeFileName}`;
+
+        // رفع الملف إلى Storage
+        msgBox.innerText = 'جاري رفع ملف البوت...';
+
+        const { error: uploadError } = await supabaseClient
+            .storage
+            .from('bot-files')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: 'application/zip'
+            });
+
+        if (uploadError) throw uploadError;
+
+        uploadedPath = filePath;
+
+        // حفظ بيانات الاستضافة ومسار الملف
+        msgBox.innerText = 'تم رفع الملف، جاري حفظ بيانات الاستضافة...';
+
+        const { error: insertError } = await supabaseClient
             .from('hosting_services')
             .insert({
                 user_id: user.id,
                 service_name: botName,
                 service_type: 'Discord Bot',
-                status: 'pending'
+                status: 'pending',
+                file_path: uploadedPath
             });
 
-        if (error) throw error;
+        if (insertError) {
+            // حذف الملف إذا فشل تسجيل الاستضافة
+            await supabaseClient
+                .storage
+                .from('bot-files')
+                .remove([uploadedPath]);
+
+            throw insertError;
+        }
 
         msgBox.style.color = 'var(--success)';
         msgBox.innerText =
-            'تم تسجيل الاستضافة بنجاح! وهي الآن بانتظار التجهيز.';
+            'تم إنشاء الاستضافة ورفع ملف البوت بنجاح!';
 
         nameInput.value = '';
-
-        if (fileInput) {
-            fileInput.value = '';
-        }
+        fileInput.value = '';
 
         await loadHostingServices();
 
@@ -336,7 +386,7 @@ window.createBotHosting = async function () {
 
         msgBox.style.color = 'var(--danger)';
         msgBox.innerText =
-            error.message || 'حدث خطأ أثناء إنشاء الاستضافة.';
+            error.message || 'حدث خطأ أثناء رفع ملف البوت.';
     } finally {
         createBtn.disabled = false;
     }
@@ -360,7 +410,7 @@ async function loadHostingServices() {
 
         const { data, error } = await supabaseClient
             .from('hosting_services')
-            .select('id, service_name, service_type, status, created_at')
+            .select('id, service_name, service_type, status, created_at, file_path')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
@@ -393,7 +443,12 @@ async function loadHostingServices() {
                 status.textContent = 'الحالة: متوقف 🔴';
             }
 
-            card.append(name, type, status);
+            const fileStatus = document.createElement('p');
+            fileStatus.textContent = service.file_path
+                ? 'ملف البوت: مرفوع ☑️'
+                : 'ملف البوت: غير مرفوع';
+
+            card.append(name, type, status, fileStatus);
             container.appendChild(card);
         });
 
