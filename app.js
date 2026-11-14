@@ -1,11 +1,13 @@
 
- // ================= إعداد Supabase ================= //
+// ================= إعداد Supabase ================= //
 
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
 const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 
 let supabaseClient = null;
 let isLoginMode = true;
+
+// ================= تحديد صفحة لوحة التحكم ================= //
 
 function isDashboardPage() {
     return (
@@ -48,6 +50,7 @@ window.showLogin = function () {
     document.getElementById('modal-title').innerText = 'تسجيل الدخول';
 
     const username = document.getElementById('username');
+
     if (username) {
         username.classList.add('hidden');
         username.removeAttribute('required');
@@ -71,6 +74,7 @@ window.showRegister = function () {
     document.getElementById('modal-title').innerText = 'إنشاء حساب جديد';
 
     const username = document.getElementById('username');
+
     if (username) {
         username.classList.remove('hidden');
         username.setAttribute('required', 'true');
@@ -229,11 +233,15 @@ async function checkAuthState() {
         if (dashboardContent) dashboardContent.classList.remove('hidden');
 
         await loadUserProfile(data.session.user);
+        await loadUserPlan();
         await loadHostingServices();
 
     } catch (error) {
         console.error('Auth error:', error);
-        window.location.replace('index.html');
+
+        if (loadingScreen) {
+            loadingScreen.innerText = 'حدث خطأ أثناء تحميل لوحة التحكم.';
+        }
     }
 }
 
@@ -264,7 +272,93 @@ async function loadUserProfile(user) {
     }
 }
 
-// ================= إنشاء استضافة Discord Bot ورفع الملف ================= //
+// ================= تحميل باقة العميل ================= //
+
+async function loadUserPlan() {
+    const planElement = document.getElementById('current-plan');
+    const usageElement = document.getElementById('bots-usage');
+    const ramElement = document.getElementById('plan-ram');
+
+    if (!planElement || !supabaseClient) return;
+
+    planElement.innerText = 'جاري تحميل الباقة...';
+
+    try {
+        const { data: { user }, error: authError } =
+            await supabaseClient.auth.getUser();
+
+        if (authError || !user) {
+            throw new Error('تعذر التحقق من الحساب');
+        }
+
+        const { data, error } = await supabaseClient
+            .from('user_subscriptions')
+            .select(`
+                plan_id,
+                status,
+                expires_at,
+                hosting_plans (
+                    name,
+                    max_bots,
+                    ram_mb
+                )
+            `)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        const isExpired = data?.expires_at &&
+            new Date(data.expires_at) <= new Date();
+
+        if (
+            !data ||
+            !data.hosting_plans ||
+            data.status !== 'active' ||
+            isExpired
+        ) {
+            planElement.innerText = 'لا توجد باقة فعالة';
+
+            if (usageElement) usageElement.innerText = 'عدد البوتات: غير متاح';
+            if (ramElement) ramElement.innerText = 'الذاكرة: غير متاحة';
+
+            return;
+        }
+
+        const plan = data.hosting_plans;
+
+        const { count, error: countError } = await supabaseClient
+            .from('hosting_services')
+            .select('id', {
+                count: 'exact',
+                head: true
+            })
+            .eq('user_id', user.id);
+
+        if (countError) throw countError;
+
+        planElement.innerText = plan.name;
+
+        if (usageElement) {
+            usageElement.innerText =
+                `عدد البوتات: ${count || 0} / ${plan.max_bots}`;
+        }
+
+        if (ramElement) {
+            ramElement.innerText =
+                `الذاكرة المخصصة: ${plan.ram_mb} MB`;
+        }
+
+    } catch (error) {
+        console.error('Plan error:', error);
+        planElement.innerText = 'تعذر تحميل الباقة';
+
+        if (usageElement) usageElement.innerText = 'تعذر تحميل العدد';
+        if (ramElement) ramElement.innerText = 'تعذر تحميل الذاكرة';
+    }
+}
+
+// ================= إنشاء استضافة Discord Bot ================= //
 
 window.createBotHosting = async function () {
     const nameInput = document.getElementById('new-bot-name');
@@ -329,7 +423,6 @@ window.createBotHosting = async function () {
 
         const user = userData.user;
 
-        // إنشاء مسار خاص بالعميل
         const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath = `${user.id}/${Date.now()}-${safeFileName}`;
 
@@ -349,28 +442,18 @@ window.createBotHosting = async function () {
 
         uploadedPath = filePath;
 
-        // حفظ بيانات الاستضافة ومسار الملف
-        msgBox.innerText = 'تم رفع الملف، جاري حفظ بيانات الاستضافة...';
+        // إنشاء الاستضافة عبر دالة التحقق من الباقة
+        msgBox.innerText = 'تم رفع الملف، جاري التحقق من الباقة...';
 
-        const { error: insertError } = await supabaseClient
-            .from('hosting_services')
-            .insert({
-                user_id: user.id,
-                service_name: botName,
-                service_type: 'Discord Bot',
-                status: 'pending',
-                file_path: uploadedPath
-            });
+        const { error: insertError } = await supabaseClient.rpc(
+            'create_hosting_service',
+            {
+                p_name: botName,
+                p_file_path: uploadedPath
+            }
+        );
 
-        if (insertError) {
-            // حذف الملف إذا فشل تسجيل الاستضافة
-            await supabaseClient
-                .storage
-                .from('bot-files')
-                .remove([uploadedPath]);
-
-            throw insertError;
-        }
+        if (insertError) throw insertError;
 
         msgBox.style.color = 'var(--success)';
         msgBox.innerText =
@@ -380,13 +463,27 @@ window.createBotHosting = async function () {
         fileInput.value = '';
 
         await loadHostingServices();
+        await loadUserPlan();
 
     } catch (error) {
         console.error('Create hosting error:', error);
 
+        // حذف الملف المرفوع إذا فشل إنشاء سجل الاستضافة
+        if (uploadedPath) {
+            const { error: removeError } = await supabaseClient
+                .storage
+                .from('bot-files')
+                .remove([uploadedPath]);
+
+            if (removeError) {
+                console.error('File cleanup error:', removeError);
+            }
+        }
+
         msgBox.style.color = 'var(--danger)';
         msgBox.innerText =
-            error.message || 'حدث خطأ أثناء رفع ملف البوت.';
+            error.message || 'حدث خطأ أثناء إنشاء الاستضافة.';
+
     } finally {
         createBtn.disabled = false;
     }
@@ -396,6 +493,7 @@ window.createBotHosting = async function () {
 
 async function loadHostingServices() {
     const container = document.getElementById('hosting-services-list');
+
     if (!container || !supabaseClient) return;
 
     container.innerText = 'جاري تحميل استضافاتك...';
@@ -410,7 +508,14 @@ async function loadHostingServices() {
 
         const { data, error } = await supabaseClient
             .from('hosting_services')
-            .select('id, service_name, service_type, status, created_at, file_path')
+            .select(`
+                id,
+                service_name,
+                service_type,
+                status,
+                created_at,
+                file_path
+            `)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
@@ -431,7 +536,8 @@ async function loadHostingServices() {
             name.textContent = service.service_name || 'استضافة بدون اسم';
 
             const type = document.createElement('p');
-            type.textContent = 'النوع: ' + (service.service_type || 'غير محدد');
+            type.textContent =
+                'النوع: ' + (service.service_type || 'غير محدد');
 
             const status = document.createElement('p');
 
@@ -444,6 +550,7 @@ async function loadHostingServices() {
             }
 
             const fileStatus = document.createElement('p');
+
             fileStatus.textContent = service.file_path
                 ? 'ملف البوت: مرفوع ☑️'
                 : 'ملف البوت: غير مرفوع';
@@ -454,6 +561,7 @@ async function loadHostingServices() {
 
     } catch (error) {
         console.error('Hosting services error:', error);
+
         container.innerText =
             'تعذر تحميل الاستضافات. تحقق من الاتصال والصلاحيات.';
     }
@@ -493,7 +601,7 @@ window.startBot = function () {
 
     if (!file) {
         msgBox.style.color = 'var(--warning)';
-        msgBox.innerText = 'يرجى رفع ملف البوت (index.js أو .zip).';
+        msgBox.innerText = 'يرجى رفع ملف البوت (index.js أو ZIP).';
         return;
     }
 
