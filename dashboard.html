@@ -46,6 +46,41 @@
                     </div>
                 </div>
 
+                <!-- إنشاء استضافة بوت -->
+                <div class="action-area">
+                    <h2>إنشاء استضافة Discord Bot</h2>
+                    <p>أنشئ استضافة جديدة لبوت الديسكورد الخاص بك</p>
+
+                    <div class="bot-form">
+
+                        <div class="input-group">
+                            <label for="new-bot-name">اسم البوت:</label>
+                            <input
+                                type="text"
+                                id="new-bot-name"
+                                placeholder="اكتب اسم البوت">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="new-bot-file">ملف البوت (ZIP):</label>
+                            <input
+                                type="file"
+                                id="new-bot-file"
+                                accept=".zip">
+                        </div>
+
+                        <button
+                            class="btn-primary"
+                            id="create-bot-btn"
+                            onclick="createBotHosting()">
+                            + إنشاء الاستضافة
+                        </button>
+
+                        <p id="create-bot-msg" class="msg-box"></p>
+
+                    </div>
+                </div>
+
                 <!-- إحصائيات الخادم -->
                 <h2>إحصائيات الخادم</h2>
 
