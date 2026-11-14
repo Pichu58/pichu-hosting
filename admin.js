@@ -1,69 +1,227 @@
 
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة المالك - PICHU EMPIRE</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
+const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
+const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 
-<div class="dashboard-container">
-    <header class="navbar">
-        <h2>PICHU EMPIRE</h2>
-        <div>
-            <span id="owner-name">لوحة المالك</span>
-            <button onclick="adminLogout()">تسجيل الخروج</button>
-        </div>
-    </header>
+const db = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    <main style="padding:20px; max-width:1200px; margin:auto;">
-        <h1>لوحة تحكم المالك</h1>
-        <p>إدارة العملاء وطلبات الاستضافة والباقات</p>
+const message = document.getElementById('admin-message');
+const content = document.getElementById('admin-content');
 
-        <div id="admin-message">جاري التحقق من صلاحيات المالك...</div>
+function showMessage(text, color = 'inherit') {
+    message.textContent = text;
+    message.style.color = color;
+}
 
-        <section id="admin-content" class="hidden">
+async function checkOwner() {
+    try {
+        const { data, error } = await db.auth.getSession();
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>العملاء</h3>
-                    <h2 id="customer-count">0</h2>
-                </div>
+        if (error || !data.session) {
+            window.location.replace('index.html');
+            return;
+        }
 
-                <div class="stat-card">
-                    <h3>الاستضافات</h3>
-                    <h2 id="service-count">0</h2>
-                </div>
+        const { data: admin, error: adminError } = await db
+            .from('admin_users')
+            .select('role')
+            .eq('user_id', data.session.user.id)
+            .maybeSingle();
 
-                <div class="stat-card">
-                    <h3>طلبات الانتظار</h3>
-                    <h2 id="pending-count">0</h2>
-                </div>
-            </div>
+        if (adminError || !admin || admin.role !== 'owner') {
+            showMessage('ليس لديك صلاحية الدخول إلى لوحة المالك.', 'red');
+            setTimeout(() => {
+                window.location.replace('dashboard.html');
+            }, 2000);
+            return;
+        }
 
-            <div class="stat-card" style="margin-top:20px;">
-                <h2>طلبات الاستضافة</h2>
-                <button onclick="loadAdminData()">تحديث البيانات</button>
-                <div id="services-list">جاري التحميل...</div>
-            </div>
+        document.getElementById('owner-name').textContent =
+            data.session.user.email || 'المالك';
 
-            <div class="stat-card" style="margin-top:20px;">
-                <h2>العملاء</h2>
-                <div id="customers-list">جاري التحميل...</div>
-            </div>
+        content.classList.remove('hidden');
+        await loadAdminData();
 
-            <div class="stat-card" style="margin-top:20px;">
-                <h2>الباقات</h2>
-                <div id="plans-list">جاري التحميل...</div>
-            </div>
+    } catch (error) {
+        console.error(error);
+        showMessage('حدث خطأ أثناء التحقق من الصلاحيات.', 'red');
+    }
+}
 
-        </section>
-    </main>
-</div>
+window.loadAdminData = async function () {
+    showMessage('جاري تحميل بيانات المنصة...');
 
-<script src="admin.js"></script>
-</body>
-</html>
+    try {
+        const { data, error } = await db.rpc('admin_dashboard_data');
+
+        if (error) throw error;
+
+        renderCustomers(data.customers || []);
+        renderServices(data.services || []);
+        renderPlans(data.plans || []);
+
+        document.getElementById('customer-count').textContent =
+            (data.customers || []).length;
+
+        document.getElementById('service-count').textContent =
+            (data.services || []).length;
+
+        document.getElementById('pending-count').textContent =
+            (data.services || []).filter(s => s.status === 'pending').length;
+
+        showMessage('تم تحميل بيانات المنصة بنجاح.', 'green');
+
+    } catch (error) {
+        console.error(error);
+        showMessage(error.message || 'تعذر تحميل البيانات.', 'red');
+    }
+};
+
+function renderCustomers(customers) {
+    const container = document.getElementById('customers-list');
+    container.innerHTML = '';
+
+    if (!customers.length) {
+        container.textContent = 'لا يوجد عملاء حتى الآن.';
+        return;
+    }
+
+    customers.forEach(customer => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+
+        const name = document.createElement('h3');
+        name.textContent = customer.username || 'عميل بدون اسم';
+
+        const id = document.createElement('p');
+        id.textContent = 'معرف الحساب: ' + customer.id;
+
+        card.append(name, id);
+        container.appendChild(card);
+    });
+}
+
+function renderServices(services) {
+    const container = document.getElementById('services-list');
+    container.innerHTML = '';
+
+    if (!services.length) {
+        container.textContent = 'لا توجد طلبات استضافة.';
+        return;
+    }
+
+    services.forEach(service => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+
+        const title = document.createElement('h3');
+        title.textContent = service.service_name || 'استضافة بدون اسم';
+
+        const type = document.createElement('p');
+        type.textContent = 'النوع: ' + (service.service_type || 'غير محدد');
+
+        const status = document.createElement('p');
+
+        const statusLabels = {
+            pending: 'بانتظار التجهيز 🟡',
+            approved: 'تمت الموافقة 🟢',
+            rejected: 'مرفوض 🔴',
+            running: 'يعمل 🟢'
+        };
+
+        status.textContent =
+            'الحالة: ' + (statusLabels[service.status] || service.status);
+
+        const owner = document.createElement('p');
+        owner.textContent = 'معرف العميل: ' + service.user_id;
+
+        const file = document.createElement('p');
+        file.textContent = service.file_path
+            ? 'ملف البوت: مرفوع ☑️'
+            : 'ملف البوت: غير مرفوع';
+
+        card.append(title, type, status, owner, file);
+
+        if (service.status === 'pending') {
+            const actions = document.createElement('div');
+
+            const approve = document.createElement('button');
+            approve.textContent = 'قبول الطلب';
+            approve.onclick = () =>
+                updateServiceStatus(service.id, 'approved');
+
+            const reject = document.createElement('button');
+            reject.textContent = 'رفض الطلب';
+            reject.style.marginRight = '8px';
+            reject.onclick = () =>
+                updateServiceStatus(service.id, 'rejected');
+
+            actions.append(approve, reject);
+            card.appendChild(actions);
+        }
+
+        container.appendChild(card);
+    });
+}
+
+function renderPlans(plans) {
+    const container = document.getElementById('plans-list');
+    container.innerHTML = '';
+
+    if (!plans.length) {
+        container.textContent = 'لا توجد باقات.';
+        return;
+    }
+
+    plans.forEach(plan => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+
+        const name = document.createElement('h3');
+        name.textContent = plan.name;
+
+        const bots = document.createElement('p');
+        bots.textContent = 'عدد البوتات: ' + plan.max_bots;
+
+        const ram = document.createElement('p');
+        ram.textContent = 'الذاكرة: ' + plan.ram_mb + ' MB';
+
+        const active = document.createElement('p');
+        active.textContent = plan.is_active
+            ? 'الحالة: مفعلة 🟢'
+            : 'الحالة: غير مفعلة 🔴';
+
+        card.append(name, bots, ram, active);
+        container.appendChild(card);
+    });
+}
+
+async function updateServiceStatus(id, status) {
+    const action = status === 'approved' ? 'قبول' : 'رفض';
+
+    if (!confirm(`هل أنت متأكد من ${action} طلب الاستضافة؟`)) {
+        return;
+    }
+
+    try {
+        const { error } = await db.rpc('admin_update_service_status', {
+            p_service_id: String(id),
+            p_status: status
+        });
+
+        if (error) throw error;
+
+        alert('تم تحديث حالة الطلب بنجاح.');
+        await loadAdminData();
+
+    } catch (error) {
+        console.error(error);
+        alert(error.message || 'تعذر تحديث الطلب.');
+    }
+}
+
+window.adminLogout = async function () {
+    await db.auth.signOut();
+    window.location.replace('index.html');
+};
+
+checkOwner();
