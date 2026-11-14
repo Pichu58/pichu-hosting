@@ -264,6 +264,84 @@ async function loadUserProfile(user) {
     }
 }
 
+// ================= إنشاء استضافة Discord Bot ================= //
+
+window.createBotHosting = async function () {
+    const nameInput = document.getElementById('new-bot-name');
+    const fileInput = document.getElementById('new-bot-file');
+    const msgBox = document.getElementById('create-bot-msg');
+    const createBtn = document.getElementById('create-bot-btn');
+
+    if (!nameInput || !msgBox || !createBtn) return;
+
+    const botName = nameInput.value.trim();
+
+    if (!botName) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'يرجى إدخال اسم البوت.';
+        return;
+    }
+
+    if (botName.length > 60) {
+        msgBox.style.color = 'var(--warning)';
+        msgBox.innerText = 'اسم البوت يجب ألا يتجاوز 60 حرفاً.';
+        return;
+    }
+
+    if (!initializeSupabase()) {
+        msgBox.style.color = 'var(--danger)';
+        msgBox.innerText = 'تعذر الاتصال بقاعدة البيانات.';
+        return;
+    }
+
+    createBtn.disabled = true;
+    msgBox.style.color = 'var(--text-main)';
+    msgBox.innerText = 'جاري إنشاء الاستضافة...';
+
+    try {
+        const { data: userData, error: userError } =
+            await supabaseClient.auth.getUser();
+
+        if (userError || !userData.user) {
+            throw new Error('انتهت جلستك، يرجى تسجيل الدخول مجدداً.');
+        }
+
+        const user = userData.user;
+
+        const { error } = await supabaseClient
+            .from('hosting_services')
+            .insert({
+                user_id: user.id,
+                service_name: botName,
+                service_type: 'Discord Bot',
+                status: 'pending'
+            });
+
+        if (error) throw error;
+
+        msgBox.style.color = 'var(--success)';
+        msgBox.innerText =
+            'تم تسجيل الاستضافة بنجاح! وهي الآن بانتظار التجهيز.';
+
+        nameInput.value = '';
+
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
+        await loadHostingServices();
+
+    } catch (error) {
+        console.error('Create hosting error:', error);
+
+        msgBox.style.color = 'var(--danger)';
+        msgBox.innerText =
+            error.message || 'حدث خطأ أثناء إنشاء الاستضافة.';
+    } finally {
+        createBtn.disabled = false;
+    }
+};
+
 // ================= تحميل استضافات العميل ================= //
 
 async function loadHostingServices() {
@@ -307,11 +385,13 @@ async function loadHostingServices() {
 
             const status = document.createElement('p');
 
-            const isRunning = service.status === 'running';
-
-            status.textContent = isRunning
-                ? 'الحالة: يعمل 🟢'
-                : 'الحالة: متوقف 🔴';
+            if (service.status === 'running') {
+                status.textContent = 'الحالة: يعمل 🟢';
+            } else if (service.status === 'pending') {
+                status.textContent = 'الحالة: بانتظار التجهيز 🟡';
+            } else {
+                status.textContent = 'الحالة: متوقف 🔴';
+            }
 
             card.append(name, type, status);
             container.appendChild(card);
@@ -365,10 +445,10 @@ window.startBot = function () {
     msgBox.style.color = 'var(--warning)';
     msgBox.innerText =
         'واجهة التشغيل تجريبية حالياً، لم يتم تشغيل البوت على خادم فعلي.';
-
 };
 
-// لا تعرض نجاحاً وهمياً عند الإيقاف
+// ================= إيقاف البوت ================= //
+
 window.stopBot = function () {
     const msgBox = document.getElementById('bot-action-msg');
 
