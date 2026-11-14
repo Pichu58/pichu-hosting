@@ -1,4 +1,3 @@
-
 // ================= إعداد Supabase ================= //
 
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
@@ -36,6 +35,20 @@ function initializeSupabase() {
         console.error('Supabase initialization error:', error);
         return false;
     }
+}
+
+// ================= التحقق من حالة العميل ================= //
+
+async function checkCustomerActive(userId) {
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('is_active')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    return data && data.is_active === true;
 }
 
 // ================= نافذة تسجيل الدخول ================= //
@@ -140,8 +153,20 @@ if (authForm) {
                 if (error) throw error;
 
                 if (data.session) {
+                    const active = await checkCustomerActive(
+                        data.session.user.id
+                    );
+
+                    if (!active) {
+                        await supabaseClient.auth.signOut();
+                        throw new Error(
+                            'حسابك موقوف من إدارة الاستضافة.'
+                        );
+                    }
+
                     window.location.href = 'dashboard.html';
                 }
+
             } else {
                 if (!username) {
                     throw new Error('يرجى إدخال اسم المستخدم');
@@ -163,6 +188,17 @@ if (authForm) {
                     errorMsg.innerText =
                         'تم التسجيل بنجاح! يرجى مراجعة بريدك الإلكتروني لتأكيد الحساب قبل الدخول.';
                 } else {
+                    const active = await checkCustomerActive(
+                        data.session.user.id
+                    );
+
+                    if (!active) {
+                        await supabaseClient.auth.signOut();
+                        throw new Error(
+                            'تعذر تفعيل الحساب، يرجى التواصل مع الإدارة.'
+                        );
+                    }
+
                     errorMsg.style.color = 'var(--success)';
                     errorMsg.innerText =
                         'تم إنشاء الحساب بنجاح! جاري التوجيه...';
@@ -172,9 +208,11 @@ if (authForm) {
                     }, 1500);
                 }
             }
+
         } catch (error) {
             errorMsg.style.color = 'var(--danger)';
             errorMsg.innerText = error.message;
+
         } finally {
             submitBtn.disabled = false;
         }
@@ -229,6 +267,26 @@ async function checkAuthState() {
             return;
         }
 
+        // التحقق من أن حساب العميل مفعل
+        const active = await checkCustomerActive(
+            data.session.user.id
+        );
+
+        if (!active) {
+            await supabaseClient.auth.signOut();
+
+            if (loadingScreen) {
+                loadingScreen.innerText =
+                    'حسابك موقوف من إدارة الاستضافة.';
+            }
+
+            setTimeout(() => {
+                window.location.replace('index.html');
+            }, 2500);
+
+            return;
+        }
+
         if (loadingScreen) loadingScreen.classList.add('hidden');
         if (dashboardContent) dashboardContent.classList.remove('hidden');
 
@@ -240,7 +298,8 @@ async function checkAuthState() {
         console.error('Auth error:', error);
 
         if (loadingScreen) {
-            loadingScreen.innerText = 'حدث خطأ أثناء تحميل لوحة التحكم.';
+            loadingScreen.innerText =
+                error.message || 'حدث خطأ أثناء تحميل لوحة التحكم.';
         }
     }
 }
@@ -423,10 +482,18 @@ window.createBotHosting = async function () {
 
         const user = userData.user;
 
+        // التحقق من حالة الحساب قبل إنشاء الاستضافة
+        const active = await checkCustomerActive(user.id);
+
+        if (!active) {
+            await supabaseClient.auth.signOut();
+            window.location.replace('index.html');
+            throw new Error('حسابك موقوف من إدارة الاستضافة.');
+        }
+
         const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath = `${user.id}/${Date.now()}-${safeFileName}`;
 
-        // رفع الملف إلى Storage
         msgBox.innerText = 'جاري رفع ملف البوت...';
 
         const { error: uploadError } = await supabaseClient
@@ -442,7 +509,6 @@ window.createBotHosting = async function () {
 
         uploadedPath = filePath;
 
-        // إنشاء الاستضافة عبر دالة التحقق من الباقة
         msgBox.innerText = 'تم رفع الملف، جاري التحقق من الباقة...';
 
         const { error: insertError } = await supabaseClient.rpc(
@@ -468,7 +534,6 @@ window.createBotHosting = async function () {
     } catch (error) {
         console.error('Create hosting error:', error);
 
-        // حذف الملف المرفوع إذا فشل إنشاء سجل الاستضافة
         if (uploadedPath) {
             const { error: removeError } = await supabaseClient
                 .storage
@@ -541,7 +606,6 @@ async function loadHostingServices() {
 
             const status = document.createElement('p');
 
-            // حالات الاستضافة بعد تعديل لوحة المالك
             const statusLabels = {
                 running: 'الحالة: يعمل 🟢',
                 pending: 'الحالة: بانتظار التجهيز 🟡',
@@ -634,4 +698,4 @@ if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', checkAuthState);
 } else {
     checkAuthState();
-}
+                     }
