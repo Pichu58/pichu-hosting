@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة المالك - PICHU EMPIRE</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header class="navbar">
+        <h2>PICHU EMPIRE</h2>
+        <div>
+            <span id="owner-name">لوحة المالك</span>
+            <button onclick="adminLogout()">تسجيل الخروج</button>
+        </div>
+    </header>
+
+    <main style="padding:20px; max-width:1200px; margin:auto;">
+        <h1>لوحة تحكم المالك</h1>
+        <p>إدارة العملاء وطلبات الاستضافة والباقات</p>
+
+        <div id="admin-message">جاري التحقق من صلاحيات المالك...</div>
+
+        <section id="admin-content" class="hidden">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>العملاء</h3>
+                    <h2 id="customer-count">0</h2>
+                </div>
+
+                <div class="stat-card">
+                    <h3>الاستضافات</h3>
+                    <h2 id="service-count">0</h2>
+                </div>
+
+                <div class="stat-card">
+                    <h3>طلبات الانتظار</h3>
+                    <h2 id="pending-count">0</h2>
+                </div>
+            </div>
+
+            <div class="stat-card" style="margin-top:20px;">
+                <h2>طلبات الاستضافة</h2>
+                <button onclick="loadAdminData()">تحديث البيانات</button>
+                <div id="services-list">جاري التحميل...</div>
+            </div>
+
+            <div class="stat-card" style="margin-top:20px;">
+                <h2>العملاء</h2>
+                <div id="customers-list">جاري التحميل...</div>
+            </div>
+
+            <div class="stat-card" style="margin-top:20px;">
+                <h2>الباقات</h2>
+                <div id="plans-list">جاري التحميل...</div>
+            </div>
+
+        </section>
+    </main>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
