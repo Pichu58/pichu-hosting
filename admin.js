@@ -1,4 +1,3 @@
-
 const supabaseUrl = 'https://amwsonnzcocbucraiyof.supabase.co';
 const supabaseKey = 'sb_publishable_Yjod13-S3GbXgfdkvpwpeg_Mg3apZd2';
 
@@ -185,15 +184,92 @@ function renderPlans(plans) {
         const ram = document.createElement('p');
         ram.textContent = 'الذاكرة: ' + plan.ram_mb + ' MB';
 
+        const price = document.createElement('p');
+        price.textContent = 'السعر: ' + Number(plan.price || 0).toFixed(2);
+
         const active = document.createElement('p');
         active.textContent = plan.is_active
             ? 'الحالة: مفعلة 🟢'
             : 'الحالة: غير مفعلة 🔴';
 
-        card.append(name, bots, ram, active);
+        const edit = document.createElement('button');
+        edit.textContent = 'تعديل الباقة';
+        edit.onclick = () => editPlan(plan);
+
+        card.append(name, bots, ram, price, active, edit);
         container.appendChild(card);
     });
 }
+
+window.editPlan = function (plan) {
+    document.getElementById('plan-id').value = plan.id;
+    document.getElementById('plan-name').value = plan.name;
+    document.getElementById('plan-bots').value = plan.max_bots;
+    document.getElementById('plan-ram').value = plan.ram_mb;
+    document.getElementById('plan-price').value = plan.price || 0;
+    document.getElementById('plan-active').checked = plan.is_active;
+
+    document.getElementById('plan-form-title').textContent =
+        'تعديل الباقة: ' + plan.name;
+
+    window.scrollTo({
+        top: document.getElementById('plans-list').offsetTop,
+        behavior: 'smooth'
+    });
+};
+
+window.resetPlanForm = function () {
+    document.getElementById('plan-id').value = '';
+    document.getElementById('plan-name').value = '';
+    document.getElementById('plan-bots').value = 1;
+    document.getElementById('plan-ram').value = 256;
+    document.getElementById('plan-price').value = 0;
+    document.getElementById('plan-active').checked = true;
+
+    document.getElementById('plan-form-title').textContent =
+        'إضافة باقة جديدة';
+};
+
+window.savePlan = async function () {
+    const id = document.getElementById('plan-id').value.trim();
+    const name = document.getElementById('plan-name').value.trim();
+    const bots = Number(document.getElementById('plan-bots').value);
+    const ram = Number(document.getElementById('plan-ram').value);
+    const price = Number(document.getElementById('plan-price').value);
+    const active = document.getElementById('plan-active').checked;
+
+    if (!name || !Number.isInteger(bots) || bots < 1 ||
+        !Number.isInteger(ram) || ram < 1 ||
+        !Number.isFinite(price) || price < 0) {
+        alert('يرجى إدخال بيانات صحيحة للباقة.');
+        return;
+    }
+
+    if (!confirm('هل تريد حفظ بيانات هذه الباقة؟')) {
+        return;
+    }
+
+    try {
+        const { error } = await db.rpc('admin_save_plan', {
+            p_plan_id: id || null,
+            p_name: name,
+            p_max_bots: bots,
+            p_ram_mb: ram,
+            p_price: price,
+            p_is_active: active
+        });
+
+        if (error) throw error;
+
+        alert('تم حفظ الباقة بنجاح.');
+        resetPlanForm();
+        await loadAdminData();
+
+    } catch (error) {
+        console.error(error);
+        alert(error.message || 'تعذر حفظ الباقة.');
+    }
+};
 
 async function updateServiceStatus(id, status) {
     const action = status === 'approved' ? 'قبول' : 'رفض';
